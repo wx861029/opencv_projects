@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Demo</title>
+</head>
+<body>
+
+<p id="status">OpenCV.js is loading...</p>
+<div>
+  <div class="inputoutput">
+    <img id="imageSrc" alt="No Image" />
+    <div class="caption">imageSrc <input type="file" id="fileInput" name="file" /></div>
+  </div>
+  <div class="inputoutput">
+    <canvas id="canvasOutput" ></canvas>
+    <div class="caption">canvasOutput</div>
+  </div>
+</div>
+<script type="text/javascript">
+let imgElement = document.getElementById('imageSrc');
+let inputElement = document.getElementById('fileInput');
+inputElement.addEventListener('change', (e) => {
+  imgElement.src = URL.createObjectURL(e.target.files[0]);
+}, false);
+imgElement.onload = function() {
+  let src = cv.imread(imgElement);
+let dst = cv.Mat.zeros(src.cols, src.rows, cv.CV_8UC3);
+cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
+cv.threshold(src, src, 120, 255, cv.THRESH_BINARY);
+let contours = new cv.MatVector();
+let hierarchy = new cv.Mat();
+
+
+let xmin = 99.0;
+let xmax = 538.0;
+let xn = 20;
+let ymin = 15.0;
+let ymax = 645.0;
+let yn = 28;
+let xstep = (xmax-xmin)/(xn-1);
+let ystep = (ymax-ymin)/(yn-1);
+let fittingCircles = [];
+// You can try more different parameters
+cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+// draw contours with random Scalar
+for (let i = 0; i < contours.size(); ++i) {
+    //let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
+    //                          Math.round(Math.random() * 255));
+
+    let color= new cv.Scalar(255, 255, 255);
+    let cnt = contours.get(i);
+    let rect = cv.minAreaRect(cnt);
+    let circle = cv.minEnclosingCircle(cnt);
+    //console.log(i);
+    //console.log(circle);
+    if (circle.radius>10 || circle.radius<3){
+        continue;
+    }
+    fittingCircles.push(circle);
+    //cv.putText(dst, parseInt(circle.center.x).toString()+','+parseInt(circle.center.y).toString(), new cv.Point(circle.center.x, circle.center.y),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(0,255,255),1,8,false);
+    //cv.putText(dst, parseInt(circle.center.x).toString(), new cv.Point(circle.center.x, circle.center.y),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(0,255,255),1,8,false);
+    //cv.drawContours(dst, contours, i, color, 1, cv.LINE_8, hierarchy, 100);
+    let circleColor = new cv.Scalar(255, 0, 0);
+    cv.circle(dst, circle.center, circle.radius, circleColor);
+    cnt.delete();
+}
+
+let foundCircleIndex=[];
+for (let xi =0; xi<xn; xi++) {
+    for (let yi =0; yi<yn; yi++) {
+        let found = false;
+        let xc = xmin+xi*xstep;
+        let yc = ymin+yi*ystep;
+        for (let i =0; i< fittingCircles.length; i++){
+            let circle = fittingCircles[i];
+            if ((foundCircleIndex.indexOf(i)>0) || (circle.center.x<xc-circle.radius) || (circle.center.x>xc+circle.radius) || (circle.center.y>yc+circle.radius) || (circle.center.y<yc-circle.radius)) {
+                continue
+            }
+            let distance = Math.sqrt(Math.pow(circle.center.x-xc, 2) + Math.pow(circle.center.y-yc, 2), 2);
+            if (distance<=circle.radius) {
+                foundCircleIndex.push(i);
+                cv.putText(dst, "1", new cv.Point(xc, yc),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(255,255,255),1,8,false);
+                found = true;
+                break;
+            }
+        }
+        if(!found){
+            cv.putText(dst, "0", new cv.Point(xc, yc),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(255,255,255),1,8,false);
+        }
+    }
+}
+cv.imshow('canvasOutput', dst);
+src.delete(); dst.delete(); contours.delete(); hierarchy.delete();
+
+};
+function onOpenCvReady() {
+  document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
+}
+</script>
+<script async src="opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+</body>
+</html>
