@@ -2,36 +2,95 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Demo</title>
+<title>Detection Demo</title>
 </head>
 <body>
 
-<p id="status">OpenCV.js is loading...</p>
+<p id="status">Library is loading...</p>
 <div>
-  <div class="inputoutput">
-    <img id="imageSrc" alt="No Image" />
-    <div class="caption">imageSrc <input type="file" id="fileInput" name="file" /></div>
-  </div>
-  <div class="inputoutput">
-    <canvas id="canvasOutput" ></canvas>
-    <div class="caption">canvasOutput</div>
-  </div>
+
+<div>
+    <table cellpadding="0" cellspacing="0" width="0" border="1">
+    <tbody>
+    <tr>
+        <td>
+            <div class="caption">Srouce Image <input type="file" id="fileInput" name="file" accept="image/*"><button onclick=switchBtnEvent()>Switch Image Size</button></div>
+        </td>
+        <td>
+            <div class="caption">Detection</div>
+        </td>
+        <td>
+            <div class="caption">Metrix</div>
+        </td>
+    <tr>
+    </tr>
+        <td>
+        <div style="width:620px;height:750px;overflow:scroll;">
+            <img id="imageSrc" style="display:none;">
+            <img id="imageSrcSml" style="width:400px;height:500px;">
+        </div>
+        </td>
+        <td>
+        <div style="width:620px;height:750px;overflow:scroll;">
+            <canvas id="canvasDetect"  style="display:none;"></canvas>
+            <canvas id="canvasDetectSml" style="width:400px;height:500px;"></canvas>
+        </div>
+        </td>
+        <td>
+        <div style="width:620px;height:750px;overflow:scroll;">
+            <canvas id="canvasResult"  style="display:none;"></canvas>
+            <canvas id="canvasResultSml" style="width:400px;height:500px;"></canvas>
+        </div>
+        </td>
+    </tr>
+    </tbody></table>
 </div>
+</div>
+
+
+
+
 <script type="text/javascript">
+
+let viewFlag = true;
+
+function switchBtnEvent(){
+    if (viewFlag) {
+        document.getElementById('imageSrc').style.display = '';
+        document.getElementById('imageSrcSml').style.display = 'none';
+        document.getElementById('canvasDetect').style.display = '';
+        document.getElementById('canvasDetectSml').style.display = 'none';
+        document.getElementById('canvasResult').style.display = '';
+        document.getElementById('canvasResultSml').style.display = 'none';
+        viewFlag = false;
+    } else {
+        document.getElementById('imageSrc').style.display = 'none';
+        document.getElementById('imageSrcSml').style.display = '';
+        document.getElementById('canvasDetect').style.display = 'none';
+        document.getElementById('canvasDetectSml').style.display = '';
+        document.getElementById('canvasResult').style.display = 'none';
+        document.getElementById('canvasResultSml').style.display = '';
+        viewFlag = true;
+    }
+}
+
+
 let imgElement = document.getElementById('imageSrc');
 let inputElement = document.getElementById('fileInput');
 inputElement.addEventListener('change', (e) => {
   imgElement.src = URL.createObjectURL(e.target.files[0]);
+  document.getElementById('imageSrcSml').src = URL.createObjectURL(e.target.files[0]);
 }, false);
 imgElement.onload = function() {
-  let src = cv.imread(imgElement);
+let src = cv.imread(imgElement);
+// initial zero matrix
 let dst = cv.Mat.zeros(src.cols, src.rows, cv.CV_8UC3);
 cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY, 0);
 cv.threshold(src, src, 120, 255, cv.THRESH_BINARY);
 let contours = new cv.MatVector();
 let hierarchy = new cv.Mat();
 
-
+// standard opoints cfg
 let xmin = 99.0;
 let xmax = 538.0;
 let xn = 20;
@@ -40,17 +99,23 @@ let ymax = 645.0;
 let yn = 28;
 let xstep = (xmax-xmin)/(xn-1);
 let ystep = (ymax-ymin)/(yn-1);
+// fitting circles cache
 let fittingCircles = [];
+
 // You can try more different parameters
 cv.findContours(src, contours, hierarchy, cv.RETR_CCOMP, cv.CHAIN_APPROX_SIMPLE);
+
+
 // draw contours with random Scalar
+let dstMid = dst.clone();
 for (let i = 0; i < contours.size(); ++i) {
     //let color = new cv.Scalar(Math.round(Math.random() * 255), Math.round(Math.random() * 255),
     //                          Math.round(Math.random() * 255));
-
     let color= new cv.Scalar(255, 255, 255);
     let cnt = contours.get(i);
+    // fitting rect
     let rect = cv.minAreaRect(cnt);
+    // fitting circle
     let circle = cv.minEnclosingCircle(cnt);
     //console.log(i);
     //console.log(circle);
@@ -61,10 +126,11 @@ for (let i = 0; i < contours.size(); ++i) {
     //cv.putText(dst, parseInt(circle.center.x).toString()+','+parseInt(circle.center.y).toString(), new cv.Point(circle.center.x, circle.center.y),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(0,255,255),1,8,false);
     //cv.putText(dst, parseInt(circle.center.x).toString(), new cv.Point(circle.center.x, circle.center.y),cv.FONT_HERSHEY_SIMPLEX,0.3,new cv.Scalar(0,255,255),1,8,false);
     //cv.drawContours(dst, contours, i, color, 1, cv.LINE_8, hierarchy, 100);
-    let circleColor = new cv.Scalar(255, 0, 0);
-    cv.circle(dst, circle.center, circle.radius, circleColor);
+    let circleColor = new cv.Scalar(255, 255, 255);
+    cv.circle(dstMid, circle.center, circle.radius, circleColor);
     cnt.delete();
 }
+
 
 let foundCircleIndex=[];
 for (let xi =0; xi<xn; xi++) {
@@ -90,12 +156,28 @@ for (let xi =0; xi<xn; xi++) {
         }
     }
 }
-cv.imshow('canvasOutput', dst);
-src.delete(); dst.delete(); contours.delete(); hierarchy.delete();
+cv.imshow('canvasDetect', dstMid);
+cv.imshow('canvasResult', dst);
+// small imgs
+let dsize = new cv.Size(400, 500);
+let dstMidSml = new cv.Mat();
+cv.resize(dstMid, dstMidSml, dsize, 0, 0, cv.INTER_AREA);
+let dstSml = new cv.Mat();
+cv.resize(dst, dstSml, dsize, 0, 0, cv.INTER_AREA);
+cv.imshow('canvasDetectSml', dstMidSml);
+cv.imshow('canvasResultSml', dstSml);
+
+src.delete();
+dstMid.delete();
+dst.delete();
+dstMidSml.delete();
+dstSml.delete();
+contours.delete();
+hierarchy.delete();
 
 };
 function onOpenCvReady() {
-  document.getElementById('status').innerHTML = 'OpenCV.js is ready.';
+  document.getElementById('status').innerHTML = 'Library is ready.';
 }
 </script>
 <script async src="opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
